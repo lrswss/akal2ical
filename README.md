@@ -1,4 +1,6 @@
-# akal2ical v0.1 (29.12.2018)
+# akal2ical v0.1
+
+## Motivation
 
 Perl-Skript, um aus dem Abfuhrkalender des [AfA Karlsruhe](https://www.karlsruhe.de/b4/buergerdienste/abfall.de) 
 die Termine zu einem angegebenen Straßenzug - die leider nur als HTML-Tabelle angezeigt 
@@ -11,6 +13,20 @@ lediglich die über die öffentlichen Webseiten des AfA zur Verfügung gestellte
 Alle Angaben sind ohne Gewähr!
 
 Siehe auch: https://web3.karlsruhe.de/service/abfall/akal/akal.php
+
+## Bedienung
+
+```
+Aufruf: akal2ical.pl --strasse '<strassenname oder -namensteil>'
+Optionen: --startzeit <stunde>   : Startzeit für Abfuhrtermine (Standard 6 Uhr)
+          --dauer <minuten>      : Dauer der Abfuhrtermine (Standard 15 Min.)
+          --erinnerung <minuten> : Minuten vorher erinnern (Standard aus)
+          --test                 : gefundene Abfuhrtermine nur anzeigen
+          --hilfe                : diese Kurzhilfe anzeigen
+  
+Den Straßennamen inkl. Hausnummerbereich in Hochkommata einschließen!
+Beispiel: akal2ical.pl --strasse 'Weltzienstraße 14-Ende'
+```
 
 ## Installation
 
