@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 ############################################################################
 #
-# akal2ical v0.1 (29.12.2018)
-# Copyright (c) 2018  Lars Wessels <software@bytebox.org>
+# akal2ical v0.1.1 (15.01.2019)
+# Copyright (c) 2018-2019  Lars Wessels <software@bytebox.org>
 #
 # Aus dem Abfuhrkalender des AfA Karlsruhe die Termine zu einem angegebenen
 # Straßenzug - die leider nur als HTML-Tabelle angezeigt werden - auslesen
@@ -28,7 +28,7 @@
 #
 ############################################################################
 #
-# Copyright (c) 2018  Lars Wessels <software@bytebox.org>
+# Copyright (c) 2018-2019  Lars Wessels <software@bytebox.org>
 #
 # Dieses Programm ist freie Software. Sie können es unter den Bedingungen
 # der GNU General Public License, wie von der Free Software Foundation
@@ -80,7 +80,7 @@ my $alarm_min = 0;
 ############################################################################
 
 # Versionsnummer
-my $p_version = 'v0.1';
+my $p_version = 'v0.1.1';
 
 # Kommandozeilenoptionen definieren
 my $help = 0;
@@ -137,11 +137,11 @@ $stripper->eof;
 my %pos;
 my @tokens = split(/ /, $text);
 foreach (0..$#tokens) {
-	if ($tokens[$_] =~ /Restmüll,/) { $pos{'Restmüll'} = $_ };
-	if ($tokens[$_] =~ /Bioabfall,/) { $pos{'Bioabfall'} = $_ };
-	if ($tokens[$_] =~ /Wertstoff,/) { $pos{'Wertstoff'} = $_ };
-	if ($tokens[$_] =~ /Papier,/) { $pos{'Papier'} = $_ };
-	if ($tokens[$_] =~ /Haushalts/) { $pos{'Ende'} = $_ };
+	if ($tokens[$_] =~ /Restmüll/) { $pos{'Restmüll'} = $_; }
+	if ($tokens[$_] =~ /Bioabfall/) { $pos{'Bioabfall'} = $_; }
+	if ($tokens[$_] =~ /Wertstoff/) { $pos{'Wertstoff'} = $_; }
+	if ($tokens[$_] =~ /Papier/) { $pos{'Papier'} = $_; }
+	if ($tokens[$_] =~ /Haushalts/) { $pos{'Ende'} = $_; }
 }
 
 # neuen Kalender im iCalendar-Format erzeugen
@@ -308,7 +308,7 @@ sub query_streets() {
 # Hilfe zum Aufruf des Skript ausgeben
 sub usage() {
 	select STDERR;
-	printf "\nakal2ical %s - Copyright (c) 2018 Lars Wessels <software\@bytebox.org>\n", $p_version;
+	printf "\nakal2ical %s - Copyright (c) 2018-2019 Lars Wessels <software\@bytebox.org>\n", $p_version;
 	print "Abfuhrtermine des AfA Karlsruhe für den angegebenen Straßenzug abrufen\n";
 	print "und als iCal-Datei (*.ics) speichern. Alle Angaben sind ohne Gewähr!\n\n";
 	print "Aufruf: akal2ical.pl --strasse '<strassenname oder -namensteil>'\n";
