@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 ############################################################################
 #
-# akal2ical v0.1.1 (15.01.2019)
+# akal2ical v0.1.2 (09.04.2019)
 # Copyright (c) 2018-2019  Lars Wessels <software@bytebox.org>
 #
 # Aus dem Abfuhrkalender des AfA Karlsruhe die Termine zu einem angegebenen
@@ -80,7 +80,7 @@ my $alarm_min = 0;
 ############################################################################
 
 # Versionsnummer
-my $p_version = 'v0.1.1';
+my $p_version = 'v0.1.2';
 
 # Kommandozeilenoptionen definieren
 my $help = 0;
@@ -137,7 +137,7 @@ $stripper->eof;
 my %pos;
 my @tokens = split(/ /, $text);
 foreach (0..$#tokens) {
-	if ($tokens[$_] =~ /Restmüll/) { $pos{'Restmüll'} = $_; }
+	if ($tokens[$_] =~ /Restm/) { $pos{'Restmüll'} = $_; }
 	if ($tokens[$_] =~ /Bioabfall/) { $pos{'Bioabfall'} = $_; }
 	if ($tokens[$_] =~ /Wertstoff/) { $pos{'Wertstoff'} = $_; }
 	if ($tokens[$_] =~ /Papier/) { $pos{'Papier'} = $_; }
