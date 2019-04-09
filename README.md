@@ -1,4 +1,4 @@
-# akal2ical v0.1.1
+# akal2ical v0.1.2
 
 ## Motivation
 
