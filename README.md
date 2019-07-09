@@ -1,11 +1,11 @@
-# akal2ical v0.1.2
+# akal2ical v0.2
 
 ## Motivation
 
 Perl-Skript, um aus dem Abfuhrkalender des [AfA Karlsruhe](https://www.karlsruhe.de/b4/buergerdienste/abfall.de) 
 die Termine zu einem angegebenen Straßenzug - die leider nur als HTML-Tabelle angezeigt 
 werden - auszulesen und in einer iCal-Datei (\*.ics) zu speichern. Da auf den Webseiten des AfA
-nur die Abfuhrtermine der kommenden drei Wochen anzeigt werden, muss dieses Skript regelmäßig
+nur die Abfuhrtermine der kommenden drei Wochen angezeigt werden, muss dieses Skript regelmäßig
 (bspw. wöchentlich per cron) aufgerufen werden.
 
 Diese Skript gehört NICHT zum offiziellen Informationsangebot des AfA Karlsruhe, sondern nutzt
@@ -21,11 +21,16 @@ Aufruf: akal2ical.pl --strasse '<strassenname oder -namensteil>'
 Optionen: --startzeit <stunde>   : Startzeit für Abfuhrtermine (Standard 6 Uhr)
           --dauer <minuten>      : Dauer der Abfuhrtermine (Standard 15 Min.)
           --erinnerung <minuten> : Minuten vorher erinnern (Standard aus)
+          --datei <dateipfad>    : vollständiger Pfad zur iCal-Ausgabedatei (*.ics)
+          --tonnen <kommaliste>  : Liste abzufragender Tonnen (schwarz,grün,rot,blau)
           --test                 : gefundene Abfuhrtermine nur anzeigen
           --hilfe                : diese Kurzhilfe anzeigen
-  
+
 Den Straßennamen inkl. Hausnummerbereich in Hochkommata einschließen!
-Beispiel: akal2ical.pl --strasse 'Weltzienstraße 14-Ende'
+Beispiel: akal2ical.pl --strasse 'Weltzienstraße'
+
+Die Liste abzufragender Tonnen getrennt durch Komma und ohne Leerzeichen angeben.
+Beispiel: akal2ical.pl --strasse 'Weltzienstraße' --tonnen rot,grün,schwarz
 ```
 
 ## Installation

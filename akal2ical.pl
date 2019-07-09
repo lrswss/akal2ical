@@ -1,14 +1,14 @@
 #!/usr/bin/perl -w
 ############################################################################
 #
-# akal2ical v0.1.2 (09.04.2019)
+# akal2ical v0.2 (06.07.2019)
 # Copyright (c) 2018-2019  Lars Wessels <software@bytebox.org>
 #
 # Aus dem Abfuhrkalender des AfA Karlsruhe die Termine zu einem angegebenen
 # Straßenzug - die leider nur als HTML-Tabelle angezeigt werden - auslesen
 # und in einer iCal-Datei speichern. Da auf den Webseiten des AfA nur die
-# Abfuhrtermine der kommenden drei Wochen anzeigt werden, muss dieses Skript
-# regelmäßig (bspw. wöchentlich per cron) aufgerufen werden.
+# Abfuhrtermine der kommenden drei Wochen angezeigt werden, muss dieses
+# Skript regelmäßig (bspw. wöchentlich per cron) aufgerufen werden.
 #
 # Diese Skript gehört NICHT zum offiziellen Informationsangebot des AfA
 # Karlsruhe, sondern nutzt lediglich die über die öffentlichen Webseiten des
@@ -66,7 +66,8 @@ my $base_url = 'https://web3.karlsruhe.de/service/abfall/akal/akal.php';
 # Termine für diese Tonnen bzw. Müllkategorien auslesen
 # mögliche Werte: schwarz od. Restmüll, grün od. Bioabfall,
 # rot od. Wertstoff, blau od. Altpapier
-my @bins = ('schwarz', 'grün', 'blau', 'rot'); 
+my @bins = ('schwarz', 'grün', 'blau', 'rot');
+my $bins = '';  # bei Angabe auf Kommandozeile
 
 # Startzeit (Stunde) für Abfuhrtermine
 my $dtstart_hour = 6;
@@ -77,15 +78,19 @@ my $event_duration = 15;
 # Minuten vorher erinnern (0 = keine Erinnerung)
 my $alarm_min = 0;  
 
+# Pfad und Name der iCal-Ausgabedatei (*.ics)
+my $ical_file = '';
+
 ############################################################################
 
 # Versionsnummer
-my $p_version = 'v0.1.2';
+my $p_version = 'v0.2';
 
 # Kommandozeilenoptionen definieren
 my $help = 0;
 GetOptions('strasse=s' => \$street, 'startzeit=i' => \$dtstart_hour,
 	'erinnerung=i' => \$alarm_min, 'dauer=i' => \$event_duration, 
+	'datei=s' => \$ical_file, 'tonnen=s' => \$bins,
 	'test' => \$test, 'hilfe' => \$help) or &usage(); 
 
 # Ein Straßenname muss angegeben werden...
@@ -106,6 +111,28 @@ $event_duration = int($event_duration);
 if ($event_duration < 10 || $event_duration > 180 ) {
 	print STDERR "FEHLER: Die Dauer der Abfuhrtermine muss zwischen 0 und 180 Minuten liegen!\n";
 	exit(5);
+}
+
+if ($ical_file =~ /^-/) {
+	print STDERR "FEHLER: Ungültiger Dateiname für ICS-Datei!\n";
+	exit(5);
+}
+
+# Nur nach Terminen für bestimmte Abfahltonnen suchen
+my $_bins = $bins;
+if (length($bins) >= 3) {
+	$_bins =~ s/(rot|grün|blau|schwarz|,)//g;
+	if ($bins =~ /(rot|grün|blau|schwarz)/i && !$_bins) {
+		@bins = ();
+		if ($bins !~ /,/) {
+			push(@bins, $bins);
+		} else {
+			@bins = split(',', $bins);
+		}
+	} else {
+		print STDERR "FEHLER: Gültige Werte für --tonnen sind schwarz, grün, rot oder blau!\n";
+		exit(5);
+	}
 }
 
 # Den angegebenen Straßennamen(teil) in Großbuchstaben
@@ -137,9 +164,9 @@ $stripper->eof;
 my %pos;
 my @tokens = split(/ /, $text);
 foreach (0..$#tokens) {
-	if ($tokens[$_] =~ /Restm/) { $pos{'Restmüll'} = $_; }
-	if ($tokens[$_] =~ /Bioabfall/) { $pos{'Bioabfall'} = $_; }
-	if ($tokens[$_] =~ /Wertstoff/) { $pos{'Wertstoff'} = $_; }
+	if ($tokens[$_] =~ /Restm/ && !$pos{'Restmüll'}) { $pos{'Restmüll'} = $_; }
+	if ($tokens[$_] =~ /Bioabfall/ && !$pos{'Bioabfall'}) { $pos{'Bioabfall'} = $_; }
+	if ($tokens[$_] =~ /Wertstoff/ && !$pos{'Wertstoff'}) { $pos{'Wertstoff'} = $_; }
 	if ($tokens[$_] =~ /Papier/) { $pos{'Papier'} = $_; }
 	if ($tokens[$_] =~ /Haushalts/) { $pos{'Ende'} = $_; }
 }
@@ -152,7 +179,7 @@ my $count = 0;
 my @black_bin;
 if ((grep { $_ =~ m/Restmüll|schwarz/ } @bins) && $pos{'Restmüll'} && $pos{'Bioabfall'}) { 
 	for (my $i = $pos{'Restmüll'}; $i < $pos{'Bioabfall'}; $i++) {
-		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/) {
+		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/ && !(grep { $_ eq $tokens[$i] } @black_bin)) {
 			push(@black_bin, $tokens[$i]);
 			$calendar->add_entry(&create_event($street, 'Restmülltonne', $3, $2, $1));
 			$count++;
@@ -165,7 +192,7 @@ if ((grep { $_ =~ m/Restmüll|schwarz/ } @bins) && $pos{'Restmüll'} && $pos{'Bi
 my @green_bin;
 if ((grep { $_ =~ /Biomüll|Bioabfall|grün/ } @bins) && $pos{'Bioabfall'} && $pos{'Wertstoff'}) { 
 	for (my $i = $pos{'Bioabfall'}; $i < $pos{'Wertstoff'}; $i++) {
-		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/) {
+		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/ && !(grep { $_ eq $tokens[$i] } @green_bin)) {
 			push(@green_bin, $tokens[$i]);
 			$calendar->add_entry(&create_event($street, 'Bioabfall', $3, $2, $1));
 			$count++;
@@ -178,7 +205,7 @@ if ((grep { $_ =~ /Biomüll|Bioabfall|grün/ } @bins) && $pos{'Bioabfall'} && $p
 my @red_bin;
 if ((grep { $_ =~ /Wertstoff|gelb|rot/ } @bins) && $pos{'Wertstoff'} && $pos{'Papier'}) { 
 	for (my $i = $pos{'Wertstoff'}; $i < $pos{'Papier'}; $i++) {
-		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/) {
+		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/ && !(grep { $_ eq $tokens[$i] } @red_bin)) {
 			push(@red_bin, $tokens[$i]);
 			$calendar->add_entry(&create_event($street, 'Wertstofftonne', $3, $2, $1));
 			$count++;
@@ -191,7 +218,7 @@ if ((grep { $_ =~ /Wertstoff|gelb|rot/ } @bins) && $pos{'Wertstoff'} && $pos{'Pa
 my @blue_bin;
 if ((grep { $_ =~ /apier|blau/ } @bins) && $pos{'Papier'} && $pos{'Ende'}) { 
 	for (my $i = $pos{'Papier'}; $i < $pos{'Ende'}; $i++) {
-		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/) {
+		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/ && !(grep { $_ eq $tokens[$i] } @blue_bin)) {
 			push(@blue_bin, $tokens[$i]);
 			$calendar->add_entry(&create_event($street, 'Altpapier', $3, $2, $1));
 			$count++;
@@ -211,15 +238,15 @@ if (!$count) {
 	print "Altpapier (blaue Tonne): ", join(' ', @blue_bin),"\n" if ($#blue_bin > -1);
 } else {
 	# Warnung ausgeben, wenn nicht für alle Müllkategorien Abfuhrtermine gefunden wurden
-	print STDERR "Keine Abfuhrtemine für Restmüll (schwarze Tonne) gefunden!\n" if ($black_bin[0] =~ /Kein/);
-	print STDERR "Keine Abfuhrtemine für Bioabfall (grüne Tonne) gefunden!\n" if ($green_bin[0] =~ /Kein/);
-	print STDERR "Keine Abfuhrtemine für Wertstoff (rote Tonne) gefunden!\n" if ($red_bin[0] =~ /Kein/);
-	print STDERR "Keine Abfuhrtemine für Altpapier (blaue Tonne) gefunden.\n" if ($blue_bin[0] =~ /Kein/);
+	print STDERR "Keine Abfuhrtemine für Restmüll (schwarze Tonne) gefunden!\n" if ($#black_bin > -1 && $black_bin[0] =~ /Kein/);
+	print STDERR "Keine Abfuhrtemine für Bioabfall (grüne Tonne) gefunden!\n" if ($#green_bin > -1 && $green_bin[0] =~ /Kein/);
+	print STDERR "Keine Abfuhrtemine für Wertstoff (rote Tonne) gefunden!\n" if ($#red_bin > -1 && $red_bin[0] =~ /Kein/);
+	print STDERR "Keine Abfuhrtemine für Altpapier (blaue Tonne) gefunden.\n" if ($#blue_bin > -1 && $blue_bin[0] =~ /Kein/);
 
 	# Abfuhrtermine in iCal-Kalenderdatei *.ics speichern
 	my %replace = (	"Ä" => "Ae", "Ü" => "Ue", "Ö" => "Oe", "ß" => "ss", " " => "_");
 	$street =~ s/(Ä|Ü|Ö|ß|\s+)/$replace{$1}/g;
-	my $ical_file = lc($street).'.ics';
+	$ical_file = lc($street).'.ics' if (!$ical_file);
 	open(ICAL, ">$ical_file") or die "FEHLER: kann die Datei '$ical_file' nicht erstellen: $!\n";
 	my $ical = $calendar->as_string;
 	$ical =~ s?PRODID.+?PRODID:-//software\@bytebox.org//akal2ical $p_version//DE?;
@@ -315,10 +342,14 @@ sub usage() {
 	print "Optionen: --startzeit <stunde>   : Startzeit für Abfuhrtermine (Standard 6 Uhr)\n";
 	print "          --dauer <minuten>      : Dauer der Abfuhrtermine (Standard 15 Min.)\n";
 	print "          --erinnerung <minuten> : Minuten vorher erinnern (Standard aus)\n";
+	print "          --datei <dateipfad>    : vollständiger Pfad zur iCal-Ausgabedatei (*.ics)\n";
+	print "          --tonnen <kommaliste>  : Liste abzufragender Tonnen (schwarz,grün,rot,blau)\n";
 	print "          --test                 : gefundene Abfuhrtermine nur anzeigen\n";
 	print "          --hilfe                : diese Kurzhilfe anzeigen\n\n";
 	print "Den Straßennamen inkl. Hausnummerbereich in Hochkommata einschließen!\n";
-	print "Beispiel: akal2ical.pl --strasse 'Weltzienstraße 14-Ende'\n\n";
+	print "Beispiel: akal2ical.pl --strasse 'Weltzienstraße'\n\n";
+	print "Die Liste abzufragender Tonnen getrennt durch Komma und ohne Leerzeichen angeben.\n";
+	print "Beispiel: akal2ical.pl --strasse 'Weltzienstraße' --tonnen rot,grün,schwarz\n\n";
 	print "Dieses Programm wird unter der GNU General Public License v3 bereitsgestellt,\n";
 	print "in der Hoffnung, dass es nützlich sein wird, aber OHNE JEDE GEWÄHRLEISTUNG;\n";
 	print "sogar ohne die implizite Gewährleistung der MARKTFÄHIGKEIT oder EIGNUNG FÜR\n";
