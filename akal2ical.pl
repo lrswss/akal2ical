@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 ############################################################################
 #
-# akal2ical v0.2 (06.07.2019)
-# Copyright (c) 2018-2019  Lars Wessels <software@bytebox.org>
+# akal2ical v0.2.1 (22.12.2020)
+# Copyright (c) 2018-2020 Lars Wessels <software@bytebox.org>
 #
 # Aus dem Abfuhrkalender des AfA Karlsruhe die Termine zu einem angegebenen
 # Straßenzug - die leider nur als HTML-Tabelle angezeigt werden - auslesen
@@ -28,7 +28,7 @@
 #
 ############################################################################
 #
-# Copyright (c) 2018-2019  Lars Wessels <software@bytebox.org>
+# Copyright (c) 2018-2020 Lars Wessels <software@bytebox.org>
 #
 # Dieses Programm ist freie Software. Sie können es unter den Bedingungen
 # der GNU General Public License, wie von der Free Software Foundation
@@ -168,7 +168,8 @@ foreach (0..$#tokens) {
 	if ($tokens[$_] =~ /Bioabfall/ && !$pos{'Bioabfall'}) { $pos{'Bioabfall'} = $_; }
 	if ($tokens[$_] =~ /Wertstoff/ && !$pos{'Wertstoff'}) { $pos{'Wertstoff'} = $_; }
 	if ($tokens[$_] =~ /Papier/) { $pos{'Papier'} = $_; }
-	if ($tokens[$_] =~ /Haushalts/) { $pos{'Ende'} = $_; }
+	if ($tokens[$_] =~ /Haushaltsgro/) { $pos{'Grossgeraete'} = $_; }
+	if ($tokens[$_] =~ /ensperrm/ && !$pos{'Sperrmuell'}) { $pos{'Sperrmuell'} = $_; }
 }
 
 # neuen Kalender im iCalendar-Format erzeugen
@@ -216,8 +217,8 @@ if ((grep { $_ =~ /Wertstoff|gelb|rot/ } @bins) && $pos{'Wertstoff'} && $pos{'Pa
 
 # Abfuhrtermine Altpapier in Text-Tokens suchen
 my @blue_bin;
-if ((grep { $_ =~ /apier|blau/ } @bins) && $pos{'Papier'} && $pos{'Ende'}) { 
-	for (my $i = $pos{'Papier'}; $i < $pos{'Ende'}; $i++) {
+if ((grep { $_ =~ /apier|blau/ } @bins) && $pos{'Papier'} && $pos{'Grossgeraete'}) {
+	for (my $i = $pos{'Papier'}; $i < $pos{'Sperrmuell'}; $i++) {
 		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/ && !(grep { $_ eq $tokens[$i] } @blue_bin)) {
 			push(@blue_bin, $tokens[$i]);
 			$calendar->add_entry(&create_event($street, 'Altpapier', $3, $2, $1));
@@ -226,6 +227,19 @@ if ((grep { $_ =~ /apier|blau/ } @bins) && $pos{'Papier'} && $pos{'Ende'}) {
 	}
 	push(@blue_bin, 'Keine Abfuhrtermine gefunden.') if ($#blue_bin < 0);
 }
+
+# Sperrmülltermin in Text-Tokens suchen (einmal pro Jahr)
+my @bulky;
+if ($pos{'Sperrmuell'}) {
+	for (my $i = $pos{'Sperrmuell'}; $i < $pos{'Sperrmuell'}+10; $i++) {
+		if ($#bulky < 0 && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/) {
+			push(@bulky, $tokens[$i]);
+			$calendar->add_entry(&create_event($street, 'Straßensperrmüll', $3, $2, $1));
+			$count++;
+		}
+	}
+}
+push(@bulky, 'Keinen Straßensperrmülltermin gefunden.') if ($#bulky < 0);
 
 if (!$count) {
 	printf STDERR "Keine Abfuhrtermine für '%s' beim AfA Karlsruhe gefunden!\n", $street;
@@ -236,12 +250,14 @@ if (!$count) {
 	print "Bioabfall (grüne Tonne): ", join(' ', @green_bin),"\n" if ($#green_bin > -1);
 	print "Wertstoff (rote Tonne): ", join(' ', @red_bin),"\n" if ($#red_bin > -1);
 	print "Altpapier (blaue Tonne): ", join(' ', @blue_bin),"\n" if ($#blue_bin > -1);
+	print "Straßensperrmüll: ", join(' ', @bulky),"\n" if ($#bulky > -1);
 } else {
 	# Warnung ausgeben, wenn nicht für alle Müllkategorien Abfuhrtermine gefunden wurden
 	print STDERR "Keine Abfuhrtemine für Restmüll (schwarze Tonne) gefunden!\n" if ($#black_bin > -1 && $black_bin[0] =~ /Kein/);
 	print STDERR "Keine Abfuhrtemine für Bioabfall (grüne Tonne) gefunden!\n" if ($#green_bin > -1 && $green_bin[0] =~ /Kein/);
 	print STDERR "Keine Abfuhrtemine für Wertstoff (rote Tonne) gefunden!\n" if ($#red_bin > -1 && $red_bin[0] =~ /Kein/);
 	print STDERR "Keine Abfuhrtemine für Altpapier (blaue Tonne) gefunden.\n" if ($#blue_bin > -1 && $blue_bin[0] =~ /Kein/);
+	print STDERR "Keinen Straßenperrmülltermin gefunden.\n" if ($#bulky < 0);
 
 	# Abfuhrtermine in iCal-Kalenderdatei *.ics speichern
 	my %replace = (	"Ä" => "Ae", "Ü" => "Ue", "Ö" => "Oe", "ß" => "ss", " " => "_");
