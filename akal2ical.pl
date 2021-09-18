@@ -1,11 +1,11 @@
 #!/usr/bin/perl -w
 ############################################################################
 #
-# akal2ical v0.2.1 (22.12.2020)
-# Copyright (c) 2018-2020 Lars Wessels <software@bytebox.org>
+# akal2ical v0.3 (18.09.2021)
+# Copyright (c) 2018-2021 Lars Wessels <software@bytebox.org>
 #
-# Aus dem Abfuhrkalender des AfA Karlsruhe die Termine zu einem angegebenen
-# Straßenzug - die leider nur als HTML-Tabelle angezeigt werden - auslesen
+# Aus dem Abfuhrkalender des AfA Karlsruhe die Termine zu der angegebenen
+# Adresse - die leider nur als HTML-Tabelle angezeigt werden - auslesen
 # und in einer iCal-Datei speichern. Da auf den Webseiten des AfA nur die
 # Abfuhrtermine der kommenden drei Wochen angezeigt werden, muss dieses
 # Skript regelmäßig (bspw. wöchentlich per cron) aufgerufen werden.
@@ -14,7 +14,7 @@
 # Karlsruhe, sondern nutzt lediglich die über die öffentlichen Webseiten des
 # AfA zur Verfügung gestellten Informationen. Alle Angaben sind ohne Gewähr!
 #
-# Siehe auch: https://web3.karlsruhe.de/service/abfall/akal/akal.php
+# Siehe auch: https://web6.karlsruhe.de/service/abfall/akal/akal.php
 #
 ############################################################################
 #
@@ -28,7 +28,7 @@
 #
 ############################################################################
 #
-# Copyright (c) 2018-2020 Lars Wessels <software@bytebox.org>
+# Copyright (c) 2018-2021 Lars Wessels <software@bytebox.org>
 #
 # Dieses Programm ist freie Software. Sie können es unter den Bedingungen
 # der GNU General Public License, wie von der Free Software Foundation
@@ -55,13 +55,13 @@ use Digest::MD5 qw(md5_hex);
 use Encode qw(encode_utf8);
 use Mojo::DOM;
 use Getopt::Long;
-use vars qw($street $test);
+use vars qw($street $street_num $test);
 use strict;
 
 ############################################################################
 
 # URL zum AfA-Abfallkalender-Skript
-my $base_url = 'https://web3.karlsruhe.de/service/abfall/akal/akal.php';
+my $base_url = 'https://web6.karlsruhe.de/service/abfall/akal/akal.php';
 
 # Termine für diese Tonnen bzw. Müllkategorien auslesen
 # mögliche Werte: schwarz od. Restmüll, grün od. Bioabfall,
@@ -84,17 +84,17 @@ my $ical_file = '';
 ############################################################################
 
 # Versionsnummer
-my $p_version = 'v0.2';
+my $p_version = 'v0.3';
 
 # Kommandozeilenoptionen definieren
 my $help = 0;
-GetOptions('strasse=s' => \$street, 'startzeit=i' => \$dtstart_hour,
-	'erinnerung=i' => \$alarm_min, 'dauer=i' => \$event_duration, 
-	'datei=s' => \$ical_file, 'tonnen=s' => \$bins,
-	'test' => \$test, 'hilfe' => \$help) or &usage(); 
+GetOptions('strasse=s' => \$street, 'nummer=s' => \$street_num,
+	'startzeit=i' => \$dtstart_hour, 'erinnerung=i' => \$alarm_min,
+	'dauer=i' => \$event_duration, 'datei=s' => \$ical_file,
+	'tonnen=s' => \$bins, 'test' => \$test, 'hilfe' => \$help) or &usage();
 
-# Ein Straßenname muss angegeben werden...
-&usage() if (!$street || $help);
+# Straßenname und (seit Aug. 2021) Hausnummer müssen angegeben werden...
+&usage() if (!$street || !$street_num || $help);
 
 # optionale Eingabewerte überprüfen
 $dtstart_hour = int($dtstart_hour);
@@ -136,23 +136,20 @@ if (length($bins) >= 3) {
 }
 
 # Den angegebenen Straßennamen(teil) in Großbuchstaben
-# umwandeln und passende Straßenzüge online beim AfA suchen
+# umwandeln und passende Straßennamen online beim AfA suchen
 my @street = split(/ /, $street); $street = '';
 while (my $part = shift(@street)) {
-	if ($part =~ /\d/) { # Hausnummernbereiche unverändert übernehmen
-		$street .= $part;
-	} else {
-		$street .= uc($part); # Straßennamen groß schreiben
-	}
+	$street .= uc($part); # Straßennamen groß schreiben
 	$street =~ tr/äöü/ÄÖÜ/;
 	$street =~ s/STRASSE/STRAßE/;
 	$street .= " " if ($#street > -1);
 }
-my $street = &query_streets($street);  # Rückgabe gültiger Straßenzug
+my $street = &query_streets($street);  # Rückgabe bei gültigem Straßenamen
 
-# Nun die Abfuhrtermine für den gefundenen Straßenzug abrufen
-print STDERR "Sende Anfrage '".$base_url."?strasse=".$street."'...\n";
-my $content = get($base_url.'?strasse='.$street);
+# Nun die Abfuhrtermine für die gefundene Adresse abrufen
+$street_num =~ s/ //g;
+print STDERR "Sende Anfrage '".$base_url."?strasse=".$street."&hausnr=".$street_num."'...\n";
+my $content = get($base_url.'?strasse='.$street.'&hausnr='.$street_num);
 
 # HTML-Tags löschen
 my $stripper = HTML::Strip->new();
@@ -175,11 +172,21 @@ foreach (0..$#tokens) {
 # neuen Kalender im iCalendar-Format erzeugen
 my $calendar = Data::ICal->new();
 my $count = 0;
+my $i_max;
 
 # Abfuhrtermine Restmüll in Text-Tokens suchen
 my @black_bin;
-if ((grep { $_ =~ m/Restmüll|schwarz/ } @bins) && $pos{'Restmüll'} && $pos{'Bioabfall'}) { 
-	for (my $i = $pos{'Restmüll'}; $i < $pos{'Bioabfall'}; $i++) {
+if ((grep { $_ =~ m/Restmüll|schwarz/ } @bins) && $pos{'Restmüll'}) {
+	if ($pos{'Bioabfall'}) {
+		$i_max = $pos{'Bioabfall'};
+	} elsif ($pos{'Wertstoff'}) {
+		$i_max = $pos{'Wertstoff'};
+	} elsif ($pos{'Papier'}) {
+		$i_max = $pos{'Papier'};
+	} else {
+		$i_max = $pos{'Grossgeraete'};
+	}
+	for (my $i = $pos{'Restmüll'}; $i < $i_max; $i++) {
 		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/ && !(grep { $_ eq $tokens[$i] } @black_bin)) {
 			push(@black_bin, $tokens[$i]);
 			$calendar->add_entry(&create_event($street, 'Restmülltonne', $3, $2, $1));
@@ -191,7 +198,14 @@ if ((grep { $_ =~ m/Restmüll|schwarz/ } @bins) && $pos{'Restmüll'} && $pos{'Bi
 
 # Abfuhrtermine Biomüll in Text-Tokens suchen
 my @green_bin;
-if ((grep { $_ =~ /Biomüll|Bioabfall|grün/ } @bins) && $pos{'Bioabfall'} && $pos{'Wertstoff'}) { 
+if ((grep { $_ =~ /Biomüll|Bioabfall|grün/ } @bins) && $pos{'Bioabfall'}) {
+	if ($pos{'Wertstoff'}) {
+		$i_max = $pos{'Wertstoff'};
+	} elsif ($pos{'Papier'}) {
+		$i_max = $pos{'Papier'};
+	} else {
+		$i_max = $pos{'Grossgeraete'};
+	}
 	for (my $i = $pos{'Bioabfall'}; $i < $pos{'Wertstoff'}; $i++) {
 		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/ && !(grep { $_ eq $tokens[$i] } @green_bin)) {
 			push(@green_bin, $tokens[$i]);
@@ -204,8 +218,9 @@ if ((grep { $_ =~ /Biomüll|Bioabfall|grün/ } @bins) && $pos{'Bioabfall'} && $p
 
 # Abfuhrtermine Wertstoff in Text-Tokens suchen
 my @red_bin;
-if ((grep { $_ =~ /Wertstoff|gelb|rot/ } @bins) && $pos{'Wertstoff'} && $pos{'Papier'}) { 
-	for (my $i = $pos{'Wertstoff'}; $i < $pos{'Papier'}; $i++) {
+if ((grep { $_ =~ /Wertstoff|gelb|rot/ } @bins) && $pos{'Wertstoff'} && ($pos{'Papier'} || $pos{'Grossgeraete'})) {
+	my $i_max = $pos{'Papier'} ? $pos{'Papier'} : $pos{'Grossgeraete'};
+	for (my $i = $pos{'Wertstoff'}; $i < $i_max; $i++) {
 		if ($tokens[$i-1] =~ /den/ && $tokens[$i] =~ /(\d\d)\.(\d\d)\.(\d{4})/ && !(grep { $_ eq $tokens[$i] } @red_bin)) {
 			push(@red_bin, $tokens[$i]);
 			$calendar->add_entry(&create_event($street, 'Wertstofftonne', $3, $2, $1));
@@ -242,10 +257,10 @@ if ($pos{'Sperrmuell'}) {
 push(@bulky, 'Keinen Straßensperrmülltermin gefunden.') if ($#bulky < 0);
 
 if (!$count) {
-	printf STDERR "Keine Abfuhrtermine für '%s' beim AfA Karlsruhe gefunden!\n", $street;
+	printf STDERR "Keine Abfuhrtermine für die Adresse '%s %s' beim AfA Karlsruhe gefunden!\n", $street, $street_num;
 	exit(1);
 } elsif ($test) {
-	printf "Kommende Abfuhrtermine für Straßenzug '%s':\n", $street;
+	printf "Kommende Abfuhrtermine für '%s %s':\n", $street, $street_num;
 	print "Restmüll (schwarze Tonne): ", join(' ', @black_bin),"\n" if ($#black_bin > -1);
 	print "Bioabfall (grüne Tonne): ", join(' ', @green_bin),"\n" if ($#green_bin > -1);
 	print "Wertstoff (rote Tonne): ", join(' ', @red_bin),"\n" if ($#red_bin > -1);
@@ -311,12 +326,12 @@ sub create_event() {
 }
 
 
-# alle bekannten Straßenzüge beim AfA nach gegebener Zeichenkette durchsuchen
+# alle bekannten Straßennamen beim AfA nach gegebener Zeichenkette durchsuchen
 sub query_streets() {
 	my $query = shift;
 
-	printf STDERR "Nach dem Straßenzug '%s' beim AfA Karlsruhe suchen...\n", $query;
-	my $html = get($base_url.'?von=A&bis=Z'); # alle Straßenzüge beim AfA abrufen
+	printf STDERR "Nach dem Straßennamen '%s' beim AfA Karlsruhe suchen...\n", $query;
+	my $html = get($base_url.'?von=A&bis=Z'); # alle Straßenname beim AfA abrufen
 	my $dom = Mojo::DOM->new($html);
 	my @streets;
 
@@ -334,14 +349,14 @@ sub query_streets() {
 	}
 
 	if ($#streets > 0) {
-		printf STDERR "Es wurden %d passende Straßenzüge gefunden. Bitte einen der ", $#streets+1;
+		printf STDERR "Es wurden %d passende Straßenname gefunden. Bitte einen der ", $#streets+1;
 		print STDERR "folgenden\nBezeichner zur Abfrage der Abfuhrtermine verwenden:\n";
 		foreach my $street (@streets) {
 			print STDERR "- '$street'\n";
 		}
 		exit(2);
 	} elsif ($#streets < 0) {
-		print STDERR "Keinen passenden Straßenzug zur Anfrage '$query' gefunden.\n";
+		print STDERR "Keinen passenden Straßennamen zur Anfrage '$query' gefunden.\n";
 		exit(3);
 	}
 	return $streets[0];
@@ -351,10 +366,10 @@ sub query_streets() {
 # Hilfe zum Aufruf des Skript ausgeben
 sub usage() {
 	select STDERR;
-	printf "\nakal2ical %s - Copyright (c) 2018-2019 Lars Wessels <software\@bytebox.org>\n", $p_version;
-	print "Abfuhrtermine des AfA Karlsruhe für den angegebenen Straßenzug abrufen\n";
+	printf "\nakal2ical %s - Copyright (c) 2018-2021 Lars Wessels <software\@bytebox.org>\n", $p_version;
+	print "Abfuhrtermine des AfA Karlsruhe für die angegebene Adresse abrufen\n";
 	print "und als iCal-Datei (*.ics) speichern. Alle Angaben sind ohne Gewähr!\n\n";
-	print "Aufruf: akal2ical.pl --strasse '<strassenname oder -namensteil>'\n";
+	print "Aufruf: akal2ical.pl --strasse '<strassenname oder -namensteil>' --nummer '<hausnummer>'\n";
 	print "Optionen: --startzeit <stunde>   : Startzeit für Abfuhrtermine (Standard 6 Uhr)\n";
 	print "          --dauer <minuten>      : Dauer der Abfuhrtermine (Standard 15 Min.)\n";
 	print "          --erinnerung <minuten> : Minuten vorher erinnern (Standard aus)\n";
@@ -362,10 +377,10 @@ sub usage() {
 	print "          --tonnen <kommaliste>  : Liste abzufragender Tonnen (schwarz,grün,rot,blau)\n";
 	print "          --test                 : gefundene Abfuhrtermine nur anzeigen\n";
 	print "          --hilfe                : diese Kurzhilfe anzeigen\n\n";
-	print "Den Straßennamen inkl. Hausnummerbereich in Hochkommata einschließen!\n";
-	print "Beispiel: akal2ical.pl --strasse 'Weltzienstraße'\n\n";
+	print "Straßenname und Hausnummer jeweils in Hochkommata einschließen!\n";
+	print "Beispiel: akal2ical.pl --strasse 'Weltzienstraße' --nummer '27'\n\n";
 	print "Die Liste abzufragender Tonnen getrennt durch Komma und ohne Leerzeichen angeben.\n";
-	print "Beispiel: akal2ical.pl --strasse 'Weltzienstraße' --tonnen rot,grün,schwarz\n\n";
+	print "Beispiel: akal2ical.pl --strasse 'Weltzienstraße' --nummer '27' --tonnen 'rot,grün,schwarz'\n\n";
 	print "Dieses Programm wird unter der GNU General Public License v3 bereitsgestellt,\n";
 	print "in der Hoffnung, dass es nützlich sein wird, aber OHNE JEDE GEWÄHRLEISTUNG;\n";
 	print "sogar ohne die implizite Gewährleistung der MARKTFÄHIGKEIT oder EIGNUNG FÜR\n";

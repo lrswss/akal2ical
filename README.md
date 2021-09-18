@@ -1,9 +1,9 @@
-# akal2ical v0.2.1
+# akal2ical v0.3
 
 ## Motivation
 
 Perl-Skript, um aus dem Abfuhrkalender des [AfA Karlsruhe](https://www.karlsruhe.de/b4/buergerdienste/abfall.de) 
-die Termine zu einem angegebenen Straßenzug - die leider nur als HTML-Tabelle angezeigt 
+die Termine zu der angegebenen Adresse - die leider nur als HTML-Tabelle angezeigt
 werden - auszulesen und in einer iCal-Datei (\*.ics) zu speichern. Da auf den Webseiten des AfA
 nur die Abfuhrtermine der kommenden drei Wochen angezeigt werden, muss dieses Skript regelmäßig
 (bspw. wöchentlich per cron) aufgerufen werden.
@@ -12,12 +12,12 @@ Diese Skript gehört NICHT zum offiziellen Informationsangebot des AfA Karlsruhe
 lediglich die über die öffentlichen Webseiten des AfA zur Verfügung gestellten Informationen. 
 Alle Angaben sind ohne Gewähr!
 
-Siehe auch: https://web3.karlsruhe.de/service/abfall/akal/akal.php
+Siehe auch: https://web6.karlsruhe.de/service/abfall/akal/akal.php
 
 ## Bedienung
 
 ```
-Aufruf: akal2ical.pl --strasse '<strassenname oder -namensteil>'
+Aufruf: akal2ical.pl --strasse '<strassenname oder -namensteil> --nummer '<hausnummer>'
 Optionen: --startzeit <stunde>   : Startzeit für Abfuhrtermine (Standard 6 Uhr)
           --dauer <minuten>      : Dauer der Abfuhrtermine (Standard 15 Min.)
           --erinnerung <minuten> : Minuten vorher erinnern (Standard aus)
@@ -26,11 +26,11 @@ Optionen: --startzeit <stunde>   : Startzeit für Abfuhrtermine (Standard 6 Uhr)
           --test                 : gefundene Abfuhrtermine nur anzeigen
           --hilfe                : diese Kurzhilfe anzeigen
 
-Den Straßennamen inkl. Hausnummerbereich in Hochkommata einschließen!
-Beispiel: akal2ical.pl --strasse 'Weltzienstraße'
+Straßenname und Hausnummer jeweils in Hochkommata einschließen!
+Beispiel: akal2ical.pl --strasse 'Weltzienstraße' --nummer '27'
 
 Die Liste abzufragender Tonnen getrennt durch Komma und ohne Leerzeichen angeben.
-Beispiel: akal2ical.pl --strasse 'Weltzienstraße' --tonnen rot,grün,schwarz
+Beispiel: akal2ical.pl --strasse 'Weltzienstraße' --nummer '27' --tonnen 'rot,grün,schwarz'
 ```
 
 ## Installation
@@ -45,7 +45,7 @@ Dieses Perl-Skript benötigt folgende Debian-Pakete (apt-get install \<paketname
   
 ## Lizenzbedingungen
 
-Copyright (c) 2018-2020  Lars Wessels (software@bytebox.org)
+Copyright (c) 2018-2021  Lars Wessels (software@bytebox.org)
 
 Dieses Programm ist freie Software. Sie können es unter den Bedingungen
 der GNU General Public License, wie von der Free Software Foundation
