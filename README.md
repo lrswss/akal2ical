@@ -1,4 +1,4 @@
-# akal2ical v0.3
+# akal2ical v0.3.1
 
 ## Motivation
 
@@ -45,7 +45,7 @@ Dieses Perl-Skript benötigt folgende Debian-Pakete (apt-get install \<paketname
   
 ## Lizenzbedingungen
 
-Copyright (c) 2018-2021  Lars Wessels (software@bytebox.org)
+Copyright (c) 2018-2022  Lars Wessels (software@bytebox.org)
 
 Dieses Programm ist freie Software. Sie können es unter den Bedingungen
 der GNU General Public License, wie von der Free Software Foundation

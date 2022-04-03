@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 ############################################################################
 #
-# akal2ical v0.3 (18.09.2021)
-# Copyright (c) 2018-2021 Lars Wessels <software@bytebox.org>
+# akal2ical v0.3.1 (03.04.2022)
+# Copyright (c) 2018-2022 Lars Wessels <software@bytebox.org>
 #
 # Aus dem Abfuhrkalender des AfA Karlsruhe die Termine zu der angegebenen
 # Adresse - die leider nur als HTML-Tabelle angezeigt werden - auslesen
@@ -28,7 +28,7 @@
 #
 ############################################################################
 #
-# Copyright (c) 2018-2021 Lars Wessels <software@bytebox.org>
+# Copyright (c) 2018-2022 Lars Wessels <software@bytebox.org>
 #
 # Dieses Programm ist freie Software. Sie können es unter den Bedingungen
 # der GNU General Public License, wie von der Free Software Foundation
@@ -84,7 +84,7 @@ my $ical_file = '';
 ############################################################################
 
 # Versionsnummer
-my $p_version = 'v0.3';
+my $p_version = 'v0.3.1';
 
 # Kommandozeilenoptionen definieren
 my $help = 0;
@@ -154,6 +154,7 @@ my $content = get($base_url.'?strasse='.$street.'&hausnr='.$street_num);
 # HTML-Tags löschen
 my $stripper = HTML::Strip->new();
 my $text = $stripper->parse($content);
+$text =~ s/[\n\r]//g;
 $stripper->eof;
 
 # Extrahierten Text in Tokens aufteilen und nach
@@ -327,24 +328,32 @@ sub create_event() {
 
 
 # alle bekannten Straßennamen beim AfA nach gegebener Zeichenkette durchsuchen
+# Namen werden aus dem Code für die JavaScript-Autocomplete-Funktion ausgelesen
 sub query_streets() {
 	my $query = shift;
 
 	printf STDERR "Nach dem Straßennamen '%s' beim AfA Karlsruhe suchen...\n", $query;
-	my $html = get($base_url.'?von=A&bis=Z'); # alle Straßenname beim AfA abrufen
-	my $dom = Mojo::DOM->new($html);
-	my @streets;
+	my @afa_streets;
+	foreach my $html (split(/\r\n/, get($base_url))) {
+		if ($html =~ /strassenliste/) {
+			$html =~ s/.*\[//;
+			$html =~ s/'//g;
+			$html =~ s/,\].*//;
+			@afa_streets = split(/,/, encode_utf8($html));
+		}
+	}
 
-	# <select> Tag suchen
-	foreach my $select ($dom->find('select')->each ) {
-  		# alle <option> Tags durchlaufen
-  		foreach my $opt ($select->find('option')->each ) {
-			my $street = encode_utf8($opt->text);
-			if ($street =~ /^$query$/i) {
-				return $street;
-			} else {
-				push(@streets, $street) if ($street =~ /^$query/i);
-			}
+	if ($#afa_streets < 0) {
+		print STDERR "Fehler beim Auslesen der Straßennamen von AfA-Webseite.\n";
+		exit(4);
+	}
+
+	my @streets;
+	foreach my $street (@afa_streets) {
+		if ($street =~ /^$query$/i) {
+			return $street;
+		} else {
+			push(@streets, $street) if ($street =~ /^$query/i);
 		}
 	}
 
@@ -366,7 +375,7 @@ sub query_streets() {
 # Hilfe zum Aufruf des Skript ausgeben
 sub usage() {
 	select STDERR;
-	printf "\nakal2ical %s - Copyright (c) 2018-2021 Lars Wessels <software\@bytebox.org>\n", $p_version;
+	printf "\nakal2ical %s - Copyright (c) 2018-2022 Lars Wessels <software\@bytebox.org>\n", $p_version;
 	print "Abfuhrtermine des AfA Karlsruhe für die angegebene Adresse abrufen\n";
 	print "und als iCal-Datei (*.ics) speichern. Alle Angaben sind ohne Gewähr!\n\n";
 	print "Aufruf: akal2ical.pl --strasse '<strassenname oder -namensteil>' --nummer '<hausnummer>'\n";
