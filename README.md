@@ -14,6 +14,11 @@ Alle Angaben sind ohne Gewähr!
 
 Siehe auch: https://web6.karlsruhe.de/service/abfall/akal/akal.php
 
+> [!NOTE]
+> Da der "Eigenbetrieb Team Sauberes Karlsruhe" (früher AfA) nun offenbar auch (Stand Januar 2024)
+> den Download eines Abfalljahreskalenders für die eigene Adresse als iCalendar-Datei anbietet,
+> ist dieses Skript quasi obsolet und das Repository wird entsprechend archiviert.
+
 ## Bedienung
 
 ```
